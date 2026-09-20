@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Remedy conversions</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Remedy conversions</h1>
+      <p class="meta">
+        <span id="counts">Loading…</span>
+      </p>
+      <label class="filter">
+        Filter by Telugu name
+        <select id="nameFilter">
+          <option value="">Select a name</option>
+        </select>
+      </label>
+    </header>
+
+    <main>
+      <section id="cards" class="cards">
+        <article class="card">
+          <h2>English</h2>
+          <div id="en" class="body">Loading…</div>
+        </article>
+        <article class="card">
+          <h2>Telugu</h2>
+          <div id="te" class="body">Loading…</div>
+        </article>
+        <article class="card">
+          <h2>Hindi</h2>
+          <div id="hi" class="body">Loading…</div>
+        </article>
+      </section>
+
+      <section class="entry">
+        <p class="oid">OID: <code id="oid">—</code></p>
+        <label for="note">Text</label>
+        <textarea id="note" rows="5" placeholder="Enter text for this remedy"></textarea>
+        <div class="actions">
+          <button id="nextBtn" type="button">Next</button>
+          <button id="okBtn" type="button" class="secondary">OK</button>
+          <a id="downloadBtn" class="button" href="/api/download">Download JSON</a>
+        </div>
+        <p id="status" class="status"></p>
+      </section>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
