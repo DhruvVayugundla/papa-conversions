@@ -92,6 +92,7 @@ async function loadJoined(force = false) {
     return {
       oid,
       name: teDoc.name || "",
+      issue: teDoc.issue || "",
       en: enMap.get(oid) || null,
       te: teDoc,
       hi: hiMap.get(oid) || null,
@@ -110,25 +111,42 @@ function stats(items, visited, entries) {
   };
 }
 
-function nextUnvisited(items, visited, afterOid = "") {
-  const visitedSet = new Set(visited);
-  const start = afterOid ? items.findIndex((item) => item.oid === afterOid) + 1 : 0;
-  for (let i = 0; i < items.length; i += 1) {
-    const item = items[(start + i) % items.length];
-    if (!visitedSet.has(item.oid)) return item;
-    if (i === items.length - 1) break;
+function uniqueIssues(items) {
+  const seen = new Set();
+  const issues = [];
+  for (const item of items) {
+    if (!item.issue || seen.has(item.issue)) continue;
+    seen.add(item.issue);
+    issues.push(item.issue);
   }
-  return items.find((item) => !visitedSet.has(item.oid)) || null;
+  return issues;
+}
+
+function scopedItems(items, issue) {
+  if (!issue) return items;
+  return items.filter((item) => item.issue === issue);
+}
+
+function nextUnvisited(items, visited, afterOid = "", issue = "") {
+  const pool = scopedItems(items, issue);
+  const visitedSet = new Set(visited);
+  const start = afterOid ? pool.findIndex((item) => item.oid === afterOid) + 1 : 0;
+  for (let i = 0; i < pool.length; i += 1) {
+    const item = pool[(start + i) % pool.length];
+    if (!visitedSet.has(item.oid)) return item;
+    if (i === pool.length - 1) break;
+  }
+  return pool.find((item) => !visitedSet.has(item.oid)) || null;
 }
 
 app.get("/api/bootstrap", async (_req, res) => {
   try {
     const items = await loadJoined();
     const visited = getVisited();
-    const names = items.map((item) => ({ oid: item.oid, name: item.name }));
+    const issues = uniqueIssues(items);
     const current = nextUnvisited(items, visited);
     res.json({
-      names,
+      issues,
       current,
       ...stats(items, visited, getEntries()),
     });
@@ -138,21 +156,26 @@ app.get("/api/bootstrap", async (_req, res) => {
   }
 });
 
-app.get("/api/item/:oid", async (req, res) => {
+app.get("/api/filter", async (req, res) => {
   try {
+    const issue = String(req.query.issue || "");
     const items = await loadJoined();
-    const current = items.find((item) => item.oid === req.params.oid) || null;
-    if (!current) return res.status(404).json({ error: "Not found" });
-    res.json({ current });
+    const visited = getVisited();
+    const current = nextUnvisited(items, visited, "", issue);
+    res.json({
+      current,
+      ...stats(scopedItems(items, issue), visited, getEntries()),
+    });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Failed to load item" });
+    res.status(500).json({ error: "Failed to filter items" });
   }
 });
 
 app.post("/api/next", async (req, res) => {
   try {
     const oid = String(req.body?.oid || "");
+    const issue = String(req.body?.issue ?? "");
     const text = String(req.body?.text ?? "");
     if (!oid) return res.status(400).json({ error: "oid is required" });
 
@@ -167,10 +190,10 @@ app.post("/api/next", async (req, res) => {
     }
 
     const items = await loadJoined();
-    const current = nextUnvisited(items, visited, oid);
+    const current = nextUnvisited(items, visited, oid, issue);
     res.json({
       current,
-      ...stats(items, visited, entries),
+      ...stats(scopedItems(items, issue), visited, entries),
     });
   } catch (err) {
     console.error(err);
@@ -181,6 +204,7 @@ app.post("/api/next", async (req, res) => {
 app.post("/api/ok", async (req, res) => {
   try {
     const oid = String(req.body?.oid || "");
+    const issue = String(req.body?.issue ?? "");
     if (!oid) return res.status(400).json({ error: "oid is required" });
 
     const visited = getVisited();
@@ -190,10 +214,10 @@ app.post("/api/ok", async (req, res) => {
     }
 
     const items = await loadJoined();
-    const current = nextUnvisited(items, visited, oid);
+    const current = nextUnvisited(items, visited, oid, issue);
     res.json({
       current,
-      ...stats(items, visited, getEntries()),
+      ...stats(scopedItems(items, issue), visited, getEntries()),
     });
   } catch (err) {
     console.error(err);

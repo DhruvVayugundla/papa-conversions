@@ -67,25 +67,27 @@ function showCurrent(item) {
   els.note.value = "";
   els.nextBtn.disabled = false;
   els.okBtn.disabled = false;
-  els.nameFilter.value = item.oid;
 }
 
 async function loadBootstrap() {
   const res = await fetch("/api/bootstrap");
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "Failed to load");
-  els.nameFilter.innerHTML = data.names
-    .map((item) => `<option value="${escapeHtml(item.oid)}">${escapeHtml(item.name)}</option>`)
-    .join("");
+  els.nameFilter.innerHTML =
+    `<option value="">All issues</option>` +
+    data.issues
+      .map((issue) => `<option value="${escapeHtml(issue)}">${escapeHtml(issue)}</option>`)
+      .join("");
   showCurrent(data.current);
   setCounts(data);
 }
 
-async function loadItem(oid) {
-  const res = await fetch(`/api/item/${encodeURIComponent(oid)}`);
+async function loadFilter(issue) {
+  const res = await fetch(`/api/filter?issue=${encodeURIComponent(issue)}`);
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "Failed to load item");
   showCurrent(data.current);
+  setCounts(data);
 }
 
 async function postAction(url, body) {
@@ -103,7 +105,7 @@ async function postAction(url, body) {
 
 els.nameFilter.addEventListener("change", async () => {
   try {
-    await loadItem(els.nameFilter.value);
+    await loadFilter(els.nameFilter.value);
   } catch (err) {
     els.status.textContent = err.message;
   }
@@ -112,7 +114,11 @@ els.nameFilter.addEventListener("change", async () => {
 els.nextBtn.addEventListener("click", async () => {
   if (!current) return;
   try {
-    await postAction("/api/next", { oid: current.oid, text: els.note.value });
+    await postAction("/api/next", {
+      oid: current.oid,
+      issue: els.nameFilter.value,
+      text: els.note.value,
+    });
   } catch (err) {
     els.status.textContent = err.message;
   }
@@ -121,7 +127,10 @@ els.nextBtn.addEventListener("click", async () => {
 els.okBtn.addEventListener("click", async () => {
   if (!current) return;
   try {
-    await postAction("/api/ok", { oid: current.oid });
+    await postAction("/api/ok", {
+      oid: current.oid,
+      issue: els.nameFilter.value,
+    });
   } catch (err) {
     els.status.textContent = err.message;
   }
