@@ -1,3 +1,5 @@
 node_modules/
 .env
 inspect-db.mjs
+data/remedies-cache.json
+data/*.tmp

@@ -43,8 +43,13 @@
         <div class="actions">
           <button id="nextBtn" type="button">Next</button>
           <button id="okBtn" type="button" class="secondary">OK</button>
-          <a id="downloadBtn" class="button" href="/api/download">Download JSON</a>
+          <a id="downloadBtn" class="button" href="/api/download">Download JSON copy</a>
         </div>
+        <p class="save-hint">
+          Next writes this note to <code>data/entries.json</code> immediately.
+          Next and OK also append the OID to <code>data/visited.json</code>, so progress
+          survives the server stopping. Download is only a copy of that file.
+        </p>
         <p id="status" class="status"></p>
       </section>
     </main>

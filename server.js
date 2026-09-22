@@ -28,6 +28,7 @@ const PORT = Number(process.env.PORT || 3000);
 const DATA_DIR = path.join(__dirname, "data");
 const ENTRIES_PATH = path.join(DATA_DIR, "entries.json");
 const VISITED_PATH = path.join(DATA_DIR, "visited.json");
+const CACHE_PATH = path.join(DATA_DIR, "remedies-cache.json");
 
 const COLLECTIONS = {
   en: "remedies-en",
@@ -39,11 +40,11 @@ const app = express();
 app.use(express.json({ limit: "1mb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
-const client = new MongoClient(URI);
+const client = URI ? new MongoClient(URI, { serverSelectionTimeoutMS: 8000 }) : null;
 let db;
 let cachedItems = [];
-let cacheLoadedAt = 0;
-const CACHE_MS = 60_000;
+let visited = [];
+let entries = [];
 
 function readJson(file, fallback) {
   try {
@@ -55,17 +56,39 @@ function readJson(file, fallback) {
 
 function writeJson(file, value) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, JSON.stringify(value, null, 2), "utf8");
+  const tmp = `${file}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(value, null, 2), "utf8");
+  fs.copyFileSync(tmp, file);
+  fs.unlinkSync(tmp);
 }
 
-function getVisited() {
-  const visited = readJson(VISITED_PATH, []);
-  return Array.isArray(visited) ? visited.map(String) : [];
+function loadDiskState() {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  const rawVisited = readJson(VISITED_PATH, []);
+  visited = Array.isArray(rawVisited) ? rawVisited.map(String) : [];
+  const rawEntries = readJson(ENTRIES_PATH, []);
+  entries = Array.isArray(rawEntries) ? rawEntries : [];
+  if (!fs.existsSync(VISITED_PATH)) writeJson(VISITED_PATH, visited);
+  if (!fs.existsSync(ENTRIES_PATH)) writeJson(ENTRIES_PATH, entries);
 }
 
-function getEntries() {
-  const entries = readJson(ENTRIES_PATH, []);
-  return Array.isArray(entries) ? entries : [];
+function persistVisited() {
+  writeJson(VISITED_PATH, visited);
+}
+
+function persistEntries() {
+  writeJson(ENTRIES_PATH, entries);
+}
+
+function persistCache() {
+  writeJson(CACHE_PATH, cachedItems);
+}
+
+function markVisited(oid) {
+  if (!visited.includes(oid)) {
+    visited.push(oid);
+    persistVisited();
+  }
 }
 
 function oidOf(doc) {
@@ -73,36 +96,47 @@ function oidOf(doc) {
 }
 
 async function loadJoined(force = false) {
-  const now = Date.now();
-  if (!force && cachedItems.length) {
+  if (!force && cachedItems.length) return cachedItems;
+
+  if (db) {
+    try {
+      const [en, te, hi] = await Promise.all([
+        db.collection(COLLECTIONS.en).find({}).toArray(),
+        db.collection(COLLECTIONS.te).find({}).toArray(),
+        db.collection(COLLECTIONS.hi).find({}).toArray(),
+      ]);
+
+      const enMap = new Map(en.map((d) => [oidOf(d), d]));
+      const hiMap = new Map(hi.map((d) => [oidOf(d), d]));
+
+      cachedItems = te.map((teDoc) => {
+        const oid = oidOf(teDoc);
+        return {
+          oid,
+          name: teDoc.name || "",
+          issue: teDoc.issue || "",
+          en: enMap.get(oid) || null,
+          te: teDoc,
+          hi: hiMap.get(oid) || null,
+        };
+      });
+      persistCache();
+      return cachedItems;
+    } catch (err) {
+      console.error("Mongo load failed, using local cache if available", err);
+    }
+  }
+
+  const cached = readJson(CACHE_PATH, []);
+  if (Array.isArray(cached) && cached.length) {
+    cachedItems = cached;
     return cachedItems;
   }
 
-  const [en, te, hi] = await Promise.all([
-    db.collection(COLLECTIONS.en).find({}).toArray(),
-    db.collection(COLLECTIONS.te).find({}).toArray(),
-    db.collection(COLLECTIONS.hi).find({}).toArray(),
-  ]);
-
-  const enMap = new Map(en.map((d) => [oidOf(d), d]));
-  const hiMap = new Map(hi.map((d) => [oidOf(d), d]));
-
-  cachedItems = te.map((teDoc) => {
-    const oid = oidOf(teDoc);
-    return {
-      oid,
-      name: teDoc.name || "",
-      issue: teDoc.issue || "",
-      en: enMap.get(oid) || null,
-      te: teDoc,
-      hi: hiMap.get(oid) || null,
-    };
-  });
-  cacheLoadedAt = now;
-  return cachedItems;
+  throw new Error("No remedies available from MongoDB or local cache");
 }
 
-function stats(items, visited, entries) {
+function stats(items) {
   return {
     remaining: items.filter((item) => !visited.includes(item.oid)).length,
     total: items.length,
@@ -127,7 +161,7 @@ function scopedItems(items, issue) {
   return items.filter((item) => item.issue === issue);
 }
 
-function nextUnvisited(items, visited, afterOid = "", issue = "") {
+function nextUnvisited(items, afterOid = "", issue = "") {
   const pool = scopedItems(items, issue);
   const visitedSet = new Set(visited);
   const start = afterOid ? pool.findIndex((item) => item.oid === afterOid) + 1 : 0;
@@ -142,13 +176,12 @@ function nextUnvisited(items, visited, afterOid = "", issue = "") {
 app.get("/api/bootstrap", async (_req, res) => {
   try {
     const items = await loadJoined();
-    const visited = getVisited();
     const issues = uniqueIssues(items);
-    const current = nextUnvisited(items, visited);
+    const current = nextUnvisited(items);
     res.json({
       issues,
       current,
-      ...stats(items, visited, getEntries()),
+      ...stats(items),
     });
   } catch (err) {
     console.error(err);
@@ -160,11 +193,10 @@ app.get("/api/filter", async (req, res) => {
   try {
     const issue = String(req.query.issue || "");
     const items = await loadJoined();
-    const visited = getVisited();
-    const current = nextUnvisited(items, visited, "", issue);
+    const current = nextUnvisited(items, "", issue);
     res.json({
       current,
-      ...stats(scopedItems(items, issue), visited, getEntries()),
+      ...stats(scopedItems(items, issue)),
     });
   } catch (err) {
     console.error(err);
@@ -179,21 +211,15 @@ app.post("/api/next", async (req, res) => {
     const text = String(req.body?.text ?? "");
     if (!oid) return res.status(400).json({ error: "oid is required" });
 
-    const entries = getEntries();
     entries.push({ oid, text });
-    writeJson(ENTRIES_PATH, entries);
-
-    const visited = getVisited();
-    if (!visited.includes(oid)) {
-      visited.push(oid);
-      writeJson(VISITED_PATH, visited);
-    }
+    persistEntries();
+    markVisited(oid);
 
     const items = await loadJoined();
-    const current = nextUnvisited(items, visited, oid, issue);
+    const current = nextUnvisited(items, oid, issue);
     res.json({
       current,
-      ...stats(scopedItems(items, issue), visited, entries),
+      ...stats(scopedItems(items, issue)),
     });
   } catch (err) {
     console.error(err);
@@ -207,17 +233,13 @@ app.post("/api/ok", async (req, res) => {
     const issue = String(req.body?.issue ?? "");
     if (!oid) return res.status(400).json({ error: "oid is required" });
 
-    const visited = getVisited();
-    if (!visited.includes(oid)) {
-      visited.push(oid);
-      writeJson(VISITED_PATH, visited);
-    }
+    markVisited(oid);
 
     const items = await loadJoined();
-    const current = nextUnvisited(items, visited, oid, issue);
+    const current = nextUnvisited(items, oid, issue);
     res.json({
       current,
-      ...stats(scopedItems(items, issue), visited, getEntries()),
+      ...stats(scopedItems(items, issue)),
     });
   } catch (err) {
     console.error(err);
@@ -226,25 +248,46 @@ app.post("/api/ok", async (req, res) => {
 });
 
 app.get("/api/download", (_req, res) => {
-  if (!fs.existsSync(ENTRIES_PATH)) writeJson(ENTRIES_PATH, []);
+  persistEntries();
+  persistVisited();
   res.download(ENTRIES_PATH, "entries.json");
 });
 
 async function start() {
-  if (!URI) {
-    console.error("MONGODB_URI is missing");
-    process.exit(1);
-  }
-  await client.connect();
-  db = client.db(DB_NAME);
-  await loadJoined(true);
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  if (!fs.existsSync(ENTRIES_PATH)) writeJson(ENTRIES_PATH, []);
-  if (!fs.existsSync(VISITED_PATH)) writeJson(VISITED_PATH, []);
+  loadDiskState();
+  const cached = readJson(CACHE_PATH, []);
+  if (Array.isArray(cached) && cached.length) cachedItems = cached;
+
   app.listen(PORT, () => {
     console.log(`Open http://localhost:${PORT}`);
+    console.log(`Visited: ${VISITED_PATH}`);
+    console.log(`Entries: ${ENTRIES_PATH}`);
   });
+
+  if (!client) {
+    console.error("MONGODB_URI is missing; serving from local cache only");
+    return;
+  }
+
+  try {
+    await client.connect();
+    db = client.db(DB_NAME);
+    await loadJoined(true);
+    console.log(`Loaded ${cachedItems.length} remedies from MongoDB`);
+  } catch (err) {
+    console.error("Could not connect to MongoDB; using local files if present", err);
+  }
 }
+
+function shutdown() {
+  persistEntries();
+  persistVisited();
+  if (client) client.close().catch(() => {});
+  process.exit(0);
+}
+
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);
 
 start().catch((err) => {
   console.error(err);

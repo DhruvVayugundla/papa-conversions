@@ -33,8 +33,15 @@ h1 {
 
 .meta,
 .status,
-.oid {
+.oid,
+.save-hint {
   color: var(--muted);
+}
+
+.save-hint {
+  margin-top: 12px;
+  font-size: 0.92rem;
+  line-height: 1.45;
 }
 
 .filter {
