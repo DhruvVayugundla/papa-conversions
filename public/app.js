@@ -6,7 +6,8 @@ const els = {
   hi: document.getElementById("hi"),
   oid: document.getElementById("oid"),
   note: document.getElementById("note"),
-  nextBtn: document.getElementById("nextBtn"),
+  noteDisplay: document.getElementById("noteDisplay"),
+  editBtn: document.getElementById("editBtn"),
   okBtn: document.getElementById("okBtn"),
   status: document.getElementById("status"),
 };
@@ -56,7 +57,9 @@ function showCurrent(item) {
     els.hi.innerHTML = "<p>All items have been visited.</p>";
     els.oid.textContent = "—";
     els.note.value = "";
-    els.nextBtn.disabled = true;
+    els.note.style.display = "none";
+    els.noteDisplay.textContent = "—";
+    els.editBtn.textContent = "Edit";
     els.okBtn.disabled = true;
     return;
   }
@@ -64,9 +67,47 @@ function showCurrent(item) {
   els.te.innerHTML = renderDoc(item.te);
   els.hi.innerHTML = renderDoc(item.hi);
   els.oid.textContent = item.oid;
-  els.note.value = "";
-  els.nextBtn.disabled = false;
+  // show last saved note if present, otherwise placeholder
+  const lastNote =
+    item?.te?.entries && item.te.entries.length
+      ? item.te.entries[item.te.entries.length - 1]
+      : null;
+  els.noteDisplay.textContent = lastNote ? `${lastNote.text}` : "—";
+  els.note.value = lastNote ? lastNote.text : "";
+  els.note.style.display = "none";
+  els.editBtn.textContent = "Edit";
   els.okBtn.disabled = false;
+}
+
+function setEditable(enabled) {
+  [els.en, els.te, els.hi].forEach((el) => {
+    if (!el) return;
+    el.contentEditable = enabled ? "true" : "false";
+    el.classList.toggle("editable", enabled);
+  });
+}
+
+function parseDocElement(el) {
+  if (!el) return null;
+  const doc = {};
+  const h3 = el.querySelector("h3");
+  doc.name = h3 ? h3.textContent.trim() : "";
+  // issue is the first <p> after a .field with text 'Issue'
+  const fields = Array.from(el.querySelectorAll(".field"));
+  for (const field of fields) {
+    const label = field.textContent.trim().toLowerCase();
+    const next = field.nextElementSibling;
+    if (!next) continue;
+    if (label === "issue") doc.issue = next.textContent.trim();
+    if (label === "ingredients") {
+      doc.ingredients = Array.from(next.querySelectorAll("li")).map((li) =>
+        li.textContent.trim(),
+      );
+    }
+    if (label === "procedure") doc.procedure = next.textContent.trim();
+    if (label === "precautions") doc.precautions = next.textContent.trim();
+  }
+  return doc;
 }
 
 async function loadBootstrap() {
@@ -76,7 +117,10 @@ async function loadBootstrap() {
   els.nameFilter.innerHTML =
     `<option value="">All issues</option>` +
     data.issues
-      .map((issue) => `<option value="${escapeHtml(issue)}">${escapeHtml(issue)}</option>`)
+      .map(
+        (issue) =>
+          `<option value="${escapeHtml(issue)}">${escapeHtml(issue)}</option>`,
+      )
       .join("");
   showCurrent(data.current);
   setCounts(data);
@@ -111,26 +155,38 @@ els.nameFilter.addEventListener("change", async () => {
   }
 });
 
-els.nextBtn.addEventListener("click", async () => {
-  if (!current) return;
-  try {
-    await postAction("/api/next", {
-      oid: current.oid,
-      issue: els.nameFilter.value,
-      text: els.note.value,
-    });
-  } catch (err) {
-    els.status.textContent = err.message;
+els.editBtn.addEventListener("click", () => {
+  const editing = els.en.contentEditable === "true";
+  if (!editing) {
+    setEditable(true);
+    els.editBtn.textContent = "Cancel";
+  } else {
+    setEditable(false);
+    els.editBtn.textContent = "Edit";
+    // reload current to reset any unsaved edits
+    showCurrent(current);
   }
 });
+
+// Next button removed: OK will save edits (if any) and advance.
 
 els.okBtn.addEventListener("click", async () => {
   if (!current) return;
   try {
+    // collect edited docs from the three panels
+    const enDoc = parseDocElement(els.en);
+    const teDoc = parseDocElement(els.te);
+    const hiDoc = parseDocElement(els.hi);
     await postAction("/api/ok", {
       oid: current.oid,
       issue: els.nameFilter.value,
+      en: enDoc,
+      te: teDoc,
+      hi: hiDoc,
     });
+    // stop editing after save
+    setEditable(false);
+    els.editBtn.textContent = "Edit";
   } catch (err) {
     els.status.textContent = err.message;
   }

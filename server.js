@@ -2,7 +2,7 @@ import express from "express";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { MongoClient } from "mongodb";
+import { MongoClient, ObjectId } from "mongodb";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -26,9 +26,6 @@ const URI = process.env.MONGODB_URI;
 const DB_NAME = process.env.MONGODB_DB || "papaweb";
 const PORT = Number(process.env.PORT || 3000);
 const DATA_DIR = path.join(__dirname, "data");
-const ENTRIES_PATH = path.join(DATA_DIR, "entries.json");
-const VISITED_PATH = path.join(DATA_DIR, "visited.json");
-const CACHE_PATH = path.join(DATA_DIR, "remedies-cache.json");
 
 const COLLECTIONS = {
   en: "remedies-en",
@@ -40,54 +37,29 @@ const app = express();
 app.use(express.json({ limit: "1mb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
-const client = URI ? new MongoClient(URI, { serverSelectionTimeoutMS: 8000 }) : null;
+const client = URI
+  ? new MongoClient(URI, { serverSelectionTimeoutMS: 8000 })
+  : null;
 let db;
-let cachedItems = [];
 let visited = [];
-let entries = [];
 
-function readJson(file, fallback) {
-  try {
-    return JSON.parse(fs.readFileSync(file, "utf8"));
-  } catch {
-    return fallback;
+// JSON file fallback removed — persistence is in MongoDB only.
+
+async function markVisited(oid) {
+  // Prefer updating the MongoDB document directly. If DB isn't available,
+  // update the in-memory fallback list.
+  if (!db) {
+    if (!visited.includes(oid)) visited.push(oid);
+    return;
   }
-}
-
-function writeJson(file, value) {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  const tmp = `${file}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(value, null, 2), "utf8");
-  fs.copyFileSync(tmp, file);
-  fs.unlinkSync(tmp);
-}
-
-function loadDiskState() {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  const rawVisited = readJson(VISITED_PATH, []);
-  visited = Array.isArray(rawVisited) ? rawVisited.map(String) : [];
-  const rawEntries = readJson(ENTRIES_PATH, []);
-  entries = Array.isArray(rawEntries) ? rawEntries : [];
-  if (!fs.existsSync(VISITED_PATH)) writeJson(VISITED_PATH, visited);
-  if (!fs.existsSync(ENTRIES_PATH)) writeJson(ENTRIES_PATH, entries);
-}
-
-function persistVisited() {
-  writeJson(VISITED_PATH, visited);
-}
-
-function persistEntries() {
-  writeJson(ENTRIES_PATH, entries);
-}
-
-function persistCache() {
-  writeJson(CACHE_PATH, cachedItems);
-}
-
-function markVisited(oid) {
-  if (!visited.includes(oid)) {
-    visited.push(oid);
-    persistVisited();
+  try {
+    const id = ObjectId.isValid(oid) ? new ObjectId(oid) : oid;
+    await db
+      .collection(COLLECTIONS.te)
+      .updateOne({ _id: id }, { $set: { visited: true } });
+    if (!visited.includes(oid)) visited.push(oid);
+  } catch (err) {
+    console.error("Failed to mark visited in DB", err);
   }
 }
 
@@ -95,52 +67,44 @@ function oidOf(doc) {
   return String(doc?._id ?? "");
 }
 
-async function loadJoined(force = false) {
-  if (!force && cachedItems.length) return cachedItems;
+async function loadJoined() {
+  if (!db) throw new Error("MongoDB connection is required");
+  const [en, te, hi] = await Promise.all([
+    db.collection(COLLECTIONS.en).find({}).toArray(),
+    db.collection(COLLECTIONS.te).find({}).toArray(),
+    db.collection(COLLECTIONS.hi).find({}).toArray(),
+  ]);
 
-  if (db) {
-    try {
-      const [en, te, hi] = await Promise.all([
-        db.collection(COLLECTIONS.en).find({}).toArray(),
-        db.collection(COLLECTIONS.te).find({}).toArray(),
-        db.collection(COLLECTIONS.hi).find({}).toArray(),
-      ]);
+  const enMap = new Map(en.map((d) => [oidOf(d), d]));
+  const hiMap = new Map(hi.map((d) => [oidOf(d), d]));
 
-      const enMap = new Map(en.map((d) => [oidOf(d), d]));
-      const hiMap = new Map(hi.map((d) => [oidOf(d), d]));
+  // derive visited list from te docs' visited field when present
+  visited = te.filter((t) => t && t.visited === true).map((t) => oidOf(t));
 
-      cachedItems = te.map((teDoc) => {
-        const oid = oidOf(teDoc);
-        return {
-          oid,
-          name: teDoc.name || "",
-          issue: teDoc.issue || "",
-          en: enMap.get(oid) || null,
-          te: teDoc,
-          hi: hiMap.get(oid) || null,
-        };
-      });
-      persistCache();
-      return cachedItems;
-    } catch (err) {
-      console.error("Mongo load failed, using local cache if available", err);
-    }
-  }
-
-  const cached = readJson(CACHE_PATH, []);
-  if (Array.isArray(cached) && cached.length) {
-    cachedItems = cached;
-    return cachedItems;
-  }
-
-  throw new Error("No remedies available from MongoDB or local cache");
+  const items = te.map((teDoc) => {
+    const oid = oidOf(teDoc);
+    return {
+      oid,
+      name: teDoc.name || "",
+      issue: teDoc.issue || "",
+      en: enMap.get(oid) || null,
+      te: teDoc,
+      hi: hiMap.get(oid) || null,
+    };
+  });
+  return items;
 }
 
 function stats(items) {
   return {
     remaining: items.filter((item) => !visited.includes(item.oid)).length,
     total: items.length,
-    saved: entries.length,
+    saved: items.reduce(
+      (acc, it) =>
+        acc +
+        (it.te && Array.isArray(it.te.entries) ? it.te.entries.length : 0),
+      0,
+    ),
     visited: visited.length,
   };
 }
@@ -164,7 +128,9 @@ function scopedItems(items, issue) {
 function nextUnvisited(items, afterOid = "", issue = "") {
   const pool = scopedItems(items, issue);
   const visitedSet = new Set(visited);
-  const start = afterOid ? pool.findIndex((item) => item.oid === afterOid) + 1 : 0;
+  const start = afterOid
+    ? pool.findIndex((item) => item.oid === afterOid) + 1
+    : 0;
   for (let i = 0; i < pool.length; i += 1) {
     const item = pool[(start + i) % pool.length];
     if (!visitedSet.has(item.oid)) return item;
@@ -204,84 +170,107 @@ app.get("/api/filter", async (req, res) => {
   }
 });
 
-app.post("/api/next", async (req, res) => {
-  try {
-    const oid = String(req.body?.oid || "");
-    const issue = String(req.body?.issue ?? "");
-    const text = String(req.body?.text ?? "");
-    if (!oid) return res.status(400).json({ error: "oid is required" });
-
-    entries.push({ oid, text });
-    persistEntries();
-    markVisited(oid);
-
-    const items = await loadJoined();
-    const current = nextUnvisited(items, oid, issue);
-    res.json({
-      current,
-      ...stats(scopedItems(items, issue)),
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to save next" });
-  }
-});
+// /api/next removed — Next button is no longer used.
 
 app.post("/api/ok", async (req, res) => {
   try {
     const oid = String(req.body?.oid || "");
     const issue = String(req.body?.issue ?? "");
+    const enDoc = req.body?.en;
+    const teDoc = req.body?.te;
+    const hiDoc = req.body?.hi;
     if (!oid) return res.status(400).json({ error: "oid is required" });
+    if (!db)
+      return res.status(500).json({ error: "MongoDB required for saving" });
+    const id = ObjectId.isValid(oid) ? new ObjectId(oid) : oid;
+    // Update each language collection if a doc payload is present
+    try {
+      if (enDoc) {
+        const set = {
+          ...(enDoc.name ? { name: enDoc.name } : {}),
+          ...(enDoc.issue ? { issue: enDoc.issue } : {}),
+          ...(Array.isArray(enDoc.ingredients)
+            ? { ingredients: enDoc.ingredients }
+            : {}),
+          ...(enDoc.procedure ? { procedure: enDoc.procedure } : {}),
+          ...(enDoc.precautions ? { precautions: enDoc.precautions } : {}),
+        };
+        if (Object.keys(set).length)
+          await db
+            .collection(COLLECTIONS.en)
+            .updateOne({ _id: id }, { $set: set }, { upsert: false });
+      }
+      if (teDoc) {
+        const set = {
+          ...(teDoc.name ? { name: teDoc.name } : {}),
+          ...(teDoc.issue ? { issue: teDoc.issue } : {}),
+          ...(Array.isArray(teDoc.ingredients)
+            ? { ingredients: teDoc.ingredients }
+            : {}),
+          ...(teDoc.procedure ? { procedure: teDoc.procedure } : {}),
+          ...(teDoc.precautions ? { precautions: teDoc.precautions } : {}),
+        };
+        // ensure visited field is set
+        set.visited = true;
+        if (Object.keys(set).length)
+          await db
+            .collection(COLLECTIONS.te)
+            .updateOne({ _id: id }, { $set: set }, { upsert: false });
+      }
+      if (hiDoc) {
+        const set = {
+          ...(hiDoc.name ? { name: hiDoc.name } : {}),
+          ...(hiDoc.issue ? { issue: hiDoc.issue } : {}),
+          ...(Array.isArray(hiDoc.ingredients)
+            ? { ingredients: hiDoc.ingredients }
+            : {}),
+          ...(hiDoc.procedure ? { procedure: hiDoc.procedure } : {}),
+          ...(hiDoc.precautions ? { precautions: hiDoc.precautions } : {}),
+        };
+        if (Object.keys(set).length)
+          await db
+            .collection(COLLECTIONS.hi)
+            .updateOne({ _id: id }, { $set: set }, { upsert: false });
+      }
+    } catch (err) {
+      console.error("Failed to update language docs", err);
+      return res.status(500).json({ error: "Failed to update docs" });
+    }
 
-    markVisited(oid);
+    await markVisited(oid);
 
     const items = await loadJoined();
     const current = nextUnvisited(items, oid, issue);
-    res.json({
-      current,
-      ...stats(scopedItems(items, issue)),
-    });
+    res.json({ current, ...stats(scopedItems(items, issue)) });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to skip item" });
   }
 });
 
-app.get("/api/download", (_req, res) => {
-  persistEntries();
-  persistVisited();
-  res.download(ENTRIES_PATH, "entries.json");
-});
+// download endpoint removed — no local JSON exports.
 
 async function start() {
-  loadDiskState();
-  const cached = readJson(CACHE_PATH, []);
-  if (Array.isArray(cached) && cached.length) cachedItems = cached;
-
   app.listen(PORT, () => {
     console.log(`Open http://localhost:${PORT}`);
-    console.log(`Visited: ${VISITED_PATH}`);
-    console.log(`Entries: ${ENTRIES_PATH}`);
   });
 
   if (!client) {
-    console.error("MONGODB_URI is missing; serving from local cache only");
+    console.error("MONGODB_URI is missing; MongoDB is required");
     return;
   }
 
   try {
     await client.connect();
     db = client.db(DB_NAME);
-    await loadJoined(true);
-    console.log(`Loaded ${cachedItems.length} remedies from MongoDB`);
+    const items = await loadJoined();
+    console.log(`Loaded ${items.length} remedies from MongoDB`);
   } catch (err) {
-    console.error("Could not connect to MongoDB; using local files if present", err);
+    console.error("Could not connect to MongoDB", err);
   }
 }
 
 function shutdown() {
-  persistEntries();
-  persistVisited();
   if (client) client.close().catch(() => {});
   process.exit(0);
 }

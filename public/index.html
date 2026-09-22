@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -39,16 +39,22 @@
       <section class="entry">
         <p class="oid">OID: <code id="oid">—</code></p>
         <label for="note">Text</label>
-        <textarea id="note" rows="5" placeholder="Enter text for this remedy"></textarea>
+        <div id="noteDisplay" class="note-display">—</div>
+        <textarea
+          id="note"
+          rows="5"
+          placeholder="Enter text for this remedy"
+          style="display: none"
+        ></textarea>
         <div class="actions">
-          <button id="nextBtn" type="button">Next</button>
-          <button id="okBtn" type="button" class="secondary">OK</button>
-          <a id="downloadBtn" class="button" href="/api/download">Download JSON copy</a>
+          <button id="editBtn" type="button">Edit</button>
+          <button id="okBtn" type="button" class="secondary">
+            Save & Next
+          </button>
         </div>
         <p class="save-hint">
-          Next writes this note to <code>data/entries.json</code> immediately.
-          Next and OK also append the OID to <code>data/visited.json</code>, so progress
-          survives the server stopping. Download is only a copy of that file.
+          "Save & Next" writes edits to the MongoDB collections and marks the
+          item visited.
         </p>
         <p id="status" class="status"></p>
       </section>
