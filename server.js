@@ -25,8 +25,6 @@ loadEnv();
 const URI = process.env.MONGODB_URI;
 const DB_NAME = process.env.MONGODB_DB || "papaweb";
 const PORT = Number(process.env.PORT || 3000);
-const DATA_DIR = path.join(__dirname, "data");
-
 const COLLECTIONS = {
   en: "remedies-en",
   te: "remedies-te",
@@ -42,8 +40,6 @@ const client = URI
   : null;
 let db;
 let visited = [];
-
-// JSON file fallback removed — persistence is in MongoDB only.
 
 async function markVisited(oid) {
   // Prefer updating the MongoDB document directly. If DB isn't available,
@@ -75,6 +71,10 @@ async function loadJoined() {
     db.collection(COLLECTIONS.hi).find({}).toArray(),
   ]);
 
+  await db
+    .collection(COLLECTIONS.te)
+    .updateMany({ visited: { $exists: false } }, { $set: { visited: false } });
+
   const enMap = new Map(en.map((d) => [oidOf(d), d]));
   const hiMap = new Map(hi.map((d) => [oidOf(d), d]));
 
@@ -99,12 +99,7 @@ function stats(items) {
   return {
     remaining: items.filter((item) => !visited.includes(item.oid)).length,
     total: items.length,
-    saved: items.reduce(
-      (acc, it) =>
-        acc +
-        (it.te && Array.isArray(it.te.entries) ? it.te.entries.length : 0),
-      0,
-    ),
+    saved: items.filter((item) => item.te && item.te.correction).length,
     visited: visited.length,
   };
 }
@@ -179,6 +174,7 @@ app.post("/api/ok", async (req, res) => {
     const enDoc = req.body?.en;
     const teDoc = req.body?.te;
     const hiDoc = req.body?.hi;
+    const correction = String(req.body?.correction ?? "").trim();
     if (!oid) return res.status(400).json({ error: "oid is required" });
     if (!db)
       return res.status(500).json({ error: "MongoDB required for saving" });
@@ -210,12 +206,20 @@ app.post("/api/ok", async (req, res) => {
           ...(teDoc.procedure ? { procedure: teDoc.procedure } : {}),
           ...(teDoc.precautions ? { precautions: teDoc.precautions } : {}),
         };
+        if (correction) set.correction = correction;
         // ensure visited field is set
         set.visited = true;
         if (Object.keys(set).length)
           await db
             .collection(COLLECTIONS.te)
             .updateOne({ _id: id }, { $set: set }, { upsert: false });
+      }
+      if (!teDoc) {
+        const set = { visited: true };
+        if (correction) set.correction = correction;
+        await db
+          .collection(COLLECTIONS.te)
+          .updateOne({ _id: id }, { $set: set }, { upsert: false });
       }
       if (hiDoc) {
         const set = {

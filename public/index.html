@@ -38,13 +38,11 @@
 
       <section class="entry">
         <p class="oid">OID: <code id="oid">—</code></p>
-        <label for="note">Text</label>
-        <div id="noteDisplay" class="note-display">—</div>
+        <label for="correction">Correction</label>
         <textarea
-          id="note"
+          id="correction"
           rows="5"
-          placeholder="Enter text for this remedy"
-          style="display: none"
+          placeholder="Enter a correction for this remedy"
         ></textarea>
         <div class="actions">
           <button id="editBtn" type="button">Edit</button>
@@ -53,8 +51,8 @@
           </button>
         </div>
         <p class="save-hint">
-          "Save & Next" writes edits to the MongoDB collections and marks the
-          item visited.
+          "Save & Next" writes language edits and the correction to MongoDB and
+          marks the item visited.
         </p>
         <p id="status" class="status"></p>
       </section>

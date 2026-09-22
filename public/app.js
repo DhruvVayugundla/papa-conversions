@@ -5,8 +5,7 @@ const els = {
   te: document.getElementById("te"),
   hi: document.getElementById("hi"),
   oid: document.getElementById("oid"),
-  note: document.getElementById("note"),
-  noteDisplay: document.getElementById("noteDisplay"),
+  correction: document.getElementById("correction"),
   editBtn: document.getElementById("editBtn"),
   okBtn: document.getElementById("okBtn"),
   status: document.getElementById("status"),
@@ -56,9 +55,7 @@ function showCurrent(item) {
     els.te.innerHTML = "<p>All items have been visited.</p>";
     els.hi.innerHTML = "<p>All items have been visited.</p>";
     els.oid.textContent = "—";
-    els.note.value = "";
-    els.note.style.display = "none";
-    els.noteDisplay.textContent = "—";
+    els.correction.value = "";
     els.editBtn.textContent = "Edit";
     els.okBtn.disabled = true;
     return;
@@ -67,14 +64,7 @@ function showCurrent(item) {
   els.te.innerHTML = renderDoc(item.te);
   els.hi.innerHTML = renderDoc(item.hi);
   els.oid.textContent = item.oid;
-  // show last saved note if present, otherwise placeholder
-  const lastNote =
-    item?.te?.entries && item.te.entries.length
-      ? item.te.entries[item.te.entries.length - 1]
-      : null;
-  els.noteDisplay.textContent = lastNote ? `${lastNote.text}` : "—";
-  els.note.value = lastNote ? lastNote.text : "";
-  els.note.style.display = "none";
+  els.correction.value = item.te?.correction || "";
   els.editBtn.textContent = "Edit";
   els.okBtn.disabled = false;
 }
@@ -183,6 +173,7 @@ els.okBtn.addEventListener("click", async () => {
       en: enDoc,
       te: teDoc,
       hi: hiDoc,
+      correction: els.correction.value,
     });
     // stop editing after save
     setEditable(false);
