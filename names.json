@@ -1,0 +1,152 @@
+[
+    {
+      "_id": { "$oid": "6aaf84bff60635426717a561" },
+      "name-te": "ఇంగువ వాసా జటామాంసి చూర్ణం",
+      "name-en": "Asafoetida, Vasa and Jatamansi Powder",
+      "name-hi": "हींग, वासा और जटामांसी चूर्ण"
+    },
+    {
+      "_id": { "$oid": "6aaf84bff60635426717a563" },
+      "name-te": "మర్రి జటలు ఆకులు పండ్ల మిశ్రమం",
+      "name-en": "Banyan Roots, Leaves and Fruits Mixture",
+      "name-hi": "बरगद की जटाओं, पत्तों और फलों का मिश्रण"
+    },
+    {
+      "_id": { "$oid": "6aaf8a90f60635426717a589" },
+      "name-te": "బెల్లం ముసాంబరం మాత్రలు",
+      "name-en": "Jaggery and Musambaram Tablets",
+      "name-hi": "गुड़ और मुसांबरम की गोलियां"
+    },
+    {
+      "_id": { "$oid": "6aaf8a90f60635426717a58a" },
+      "name-te": "కుంకుమపువ్వు జాపత్రి జాజికాయ పిప్పళ్ళు అల్లం మాత్రలు",
+      "name-en": "Saffron, Mace, Nutmeg, Long Pepper and Ginger Tablets",
+      "name-hi": "केसर, जावित्री, जायफल, पिप्पली और अदरक की गोलियां"
+    },
+    {
+      "_id": { "$oid": "6aaf8a90f60635426717a58b" },
+      "name-te": "చింత చెట్టు బెరడు పొడి",
+      "name-en": "Tamarind Tree Bark Powder",
+      "name-hi": "इमली की छाल का चूर्ण"
+    },
+    {
+      "_id": { "$oid": "6aaf8a90f60635426717a58c" },
+      "name-te": "వేపాకు కాపడం",
+      "name-en": "Neem Leaf Compress",
+      "name-hi": "नीम के पत्तों की सिकाई"
+    },
+    {
+      "_id": { "$oid": "6aaf8a90f60635426717a58d" },
+      "name-te": "వెలగ ఆకు రసం",
+      "name-en": "Bael Leaf Juice",
+      "name-hi": "बेल के पत्तों का रस"
+    },
+    {
+      "_id": { "$oid": "6aaf8a90f60635426717a58e" },
+      "name-te": "గవ్వ భస్మం రససింధూరం మిశ్రమం",
+      "name-en": "Conch Shell Ash and Ras Sindoor Mixture",
+      "name-hi": "कौड़ी भस्म और रस सिंदूर का मिश्रण"
+    },
+    {
+      "_id": { "$oid": "6aaf8a90f60635426717a58f" },
+      "name-te": "సొంటి వాయు విడంగం బెల్లం కషాయం",
+      "name-en": "Dry Ginger, Vayu Vidanga and Jaggery Decoction",
+      "name-hi": "सोंठ, वायु विडंग और गुड़ का काढ़ा"
+    },
+    {
+      "_id": { "$oid": "6aaf8a90f60635426717a590" },
+      "name-te": "సొంటి వాయు విడంగం బెల్లం కషాయం",
+      "name-en": "Dry Ginger, Vayu Vidanga and Jaggery Decoction",
+      "name-hi": "सोंठ, वायु विडंग और गुड़ का काढ़ा"
+    },
+    {
+      "_id": { "$oid": "6aaf8a90f60635426717a591" },
+      "name-te": "దొండ ఆకు రసం నువ్వుల నూనె",
+      "name-en": "Ivy Gourd Leaf Juice and Sesame Oil",
+      "name-hi": "तिंडोरा के पत्तों का रस और तिल का तेल"
+    },
+    {
+      "_id": { "$oid": "6aaf8a90f60635426717a592" },
+      "name-te": "సున్నం జిల్లేడు పాలు తాంబూలం",
+      "name-en": "Betel Leaf with Lime and Calotropis Latex",
+      "name-hi": "चूना, आक के दूध और पान का मिश्रण"
+    },
+    {
+      "_id": { "$oid": "6aaf8a90f60635426717a593" },
+      "name-te": "సొంటి వాయు విడంగం బెల్లం కషాయం",
+      "name-en": "Dry Ginger, Vayu Vidanga and Jaggery Decoction",
+      "name-hi": "सोंठ, वायु विडंग और गुड़ का काढ़ा"
+    },
+    {
+      "_id": { "$oid": "6aaf8b43f60635426717a59b" },
+      "name-te": "తమలపాకు రసం",
+      "name-en": "Betel Leaf Juice",
+      "name-hi": "पान के पत्तों का रस"
+    },
+    {
+      "_id": { "$oid": "6aaf8b43f60635426717a59c" },
+      "name-te": "పొగాకు పొడి",
+      "name-en": "Tobacco Powder",
+      "name-hi": "तंबाकू का चूर्ण"
+    },
+    {
+      "_id": { "$oid": "6aaf8b43f60635426717a59d" },
+      "name-te": "ఉల్లిపాయ రసం",
+      "name-en": "Onion Juice",
+      "name-hi": "प्याज का रस"
+    },
+    {
+      "_id": { "$oid": "6aaf8b43f60635426717a59e" },
+      "name-te": "నవాసాగరం పటిక ఉల్లిపాయ రసం మిశ్రమం",
+      "name-en": "Navasagaram, Alum and Onion Juice Mixture",
+      "name-hi": "नवसागर, फिटकरी और प्याज के रस का मिश्रण"
+    },
+    {
+      "_id": { "$oid": "6aaf8b43f60635426717a59f" },
+      "name-te": "సోపు గింజలు తమలపాకులు తేనె పేస్ట్",
+      "name-en": "Fennel, Betel Leaf and Honey Paste",
+      "name-hi": "सौंफ, पान के पत्ते और शहद का पेस्ट"
+    },
+    {
+      "_id": { "$oid": "6aaf8b43f60635426717a5a0" },
+      "name-te": "తమలపాకు రసం",
+      "name-en": "Betel Leaf Juice",
+      "name-hi": "पान के पत्तों का रस"
+    },
+    {
+      "_id": { "$oid": "6aaf8b43f60635426717a5a1" },
+      "name-te": "కాకర ఆకు పసరు నువ్వుల నూనె",
+      "name-en": "Bitter Gourd Leaf Extract and Sesame Oil",
+      "name-hi": "करेले के पत्तों का रस और तिल का तेल"
+    },
+    {
+      "_id": { "$oid": "6aaf8b43f60635426717a5a2" },
+      "name-te": "ఆవు పేడ రసం",
+      "name-en": "Cow Dung Juice",
+      "name-hi": "गाय के गोबर का रस"
+    },
+    {
+      "_id": { "$oid": "6aaf8b43f60635426717a5a3" },
+      "name-te": "ఆముదం మరియు అవిసె ఆహారం",
+      "name-en": "Castor Oil and Flax Food",
+      "name-hi": "अरंडी का तेल और अलसी का भोजन"
+    },
+    {
+      "_id": { "$oid": "6aaf8b43f60635426717a5a4" },
+      "name-te": "కరక్కాయ పిప్పళ్ళు చనుపాల మిశ్రమం",
+      "name-en": "Haritaki, Long Pepper and Breast Milk Mixture",
+      "name-hi": "हरड़, पिप्पली और स्तन के दूध का मिश्रण"
+    },
+    {
+      "_id": { "$oid": "6aaf8bc5f60635426717a5ab" },
+      "name-te": "నల్ల ఉప్పు సోపు గింజల పొడి",
+      "name-en": "Black Salt and Fennel Powder",
+      "name-hi": "काला नमक और सौंफ का चूर्ण"
+    },
+    {
+      "_id": { "$oid": "6aaf8bc5f60635426717a5ac" },
+      "name-te": "ఆముదం మసాజ్ మరియు వేడి కాపడం",
+      "name-en": "Castor Oil Massage and Warm Compress",
+      "name-hi": "अरंडी के तेल की मालिश और गर्म सेंक"
+    }
+  ]

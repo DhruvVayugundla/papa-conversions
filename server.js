@@ -79,8 +79,14 @@ async function loadJoined() {
   const hiMap = new Map(hi.map((d) => [oidOf(d), d]));
 
   // derive visited list from te docs' visited field when present
-  visited = te.filter((t) => t && t.visited === true).map((t) => oidOf(t));
-
+    visited = te
+    .filter(
+      (t) =>
+        t &&
+        t.visited === true &&
+        (!t.correction || String(t.correction).trim() === "")
+    )
+    .map((t) => oidOf(t));
   const items = te.map((teDoc) => {
     const oid = oidOf(teDoc);
     return {
@@ -99,7 +105,12 @@ function stats(items) {
   return {
     remaining: items.filter((item) => !visited.includes(item.oid)).length,
     total: items.length,
-    saved: items.filter((item) => item.te && item.te.correction).length,
+    saved: items.filter(
+      (item) =>
+        item.te &&
+        item.te.correction &&
+        String(item.te.correction).trim() !== ""
+    ).length,
     visited: visited.length,
   };
 }
